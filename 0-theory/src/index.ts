@@ -1,106 +1,110 @@
 import '../../assets/css/style.css';
 import {terminalLog} from '../../utils/log-in-terminal';
-import {Observable, Subscriber, Subscription} from "rxjs";
+import {defer, from, iif, interval, Observable, of, timer} from "rxjs";
+import {ajax} from "rxjs/internal/ajax/ajax";
+import {pluck} from "rxjs/internal/operators/pluck";
+import {tap} from "rxjs/internal/operators/tap";
+import {map} from "rxjs/internal/operators/map";
+import {filter} from "rxjs/internal/operators/filter";
+import {skip} from "rxjs/internal/operators/skip";
+import {take} from "rxjs/internal/operators/take";
 
 terminalLog('Теория');
 
 
-// Promise problem =============================================================
-
-// const sequence = new Promise((res) => {
-//   let count = 0;
-//   setInterval(() => {
-//     console.log(count);
-//     res(count++);
-//   }, 1000)
-// });
-//
-// sequence.then((v) => console.log(v));
-// sequence.then((v) => console.log(v));
-// sequence.then((v) => console.log(v));
-// sequence.then((v) => console.log(v));
-// sequence.then((v) => console.log(v));
-// sequence.then((v) => console.log(v));
-
-
-// Генераторы ==================================================================
-
-// const sequence = function* iteratorFn() {
-//   let item = 0;
-//   while (true) {
-//     yield item++;
-//   }
-// }()
-//
-// console.log(sequence.next().value);
-// console.log(sequence.next().value);
-// console.log(sequence.next().value);
-// console.log(sequence.next().value);
-// console.log(sequence.next().value);
-// console.log(sequence.next().value);
-// console.log(sequence.next().value);
-
-
-// Соединить два паттерна, Observer и Iterator = ReactiveX =====================
-
-// interval(1000).subscribe((v) => {
-//   console.log(v)
-// })
-
-
-// Что такое Promise
-// Объект, который может находиться в нескольких состояниях и может их менять.
-
-
-// Что такое Observable?=======================================================
-// Это lazy push collection
-// collection - то есть последовательность данных;
-// push - потому что не нужно запрашивать новые данные, подписался и данные в тебя пушатся
-// lazy - потому что Observable не будет пулять в тебя данные пока на него не подписаться
-
-// const sequence$ = interval(1000);
-//
-// setTimeout(() => {
-//   console.log('subscribe');
-//   sequence$.subscribe((v) => {
-//     console.log(v);
-//   })
-// }, 5000)
-
-let count = 1;
-const sequence$ = new Observable((subscriber: Subscriber<any>) => {
-  terminalLog('START');
-  const intervalId = setInterval(() => {
-    console.log(count);
-    if (count % 5 === 0) {
-      subscriber.complete();
-      return;
-    }
-    subscriber.next(count++);
-  }, 1000)
-
-  return () => {
-    clearInterval(intervalId);
-    terminalLog('ON UNSUBSCRIBE');
-  }
-})
-
-const subscription: Subscription = sequence$.subscribe({
-  next: (v) => {
-    terminalLog(`Sub 1 ====> ${v}`);
-  },
-  complete: () => terminalLog('Complete'),
+of(1, 2, 3, 4, 5).subscribe((v) => {
+  console.log('of', v);
 });
 
-setTimeout(() => {
-  sequence$.subscribe({
-    next: (v) => {
-      terminalLog(`Sub 2 ====> ${v}`);
-    },
-    complete: () => terminalLog('Complete'),
-  })
-}, 5000);
+from([1, 2, 3, 4, 5,]).subscribe((v) => {
+  console.log('from', v);
+})
 
-setTimeout(() => {
-  subscription.unsubscribe();
-}, 2000);
+from(fetch('https://jsonplaceholder.typicode.com/users')
+  .then((res) =>
+    res.json()),
+).subscribe((v) => {
+  console.log('from', v);
+})
+
+ajax({
+  url: 'https://jsonplaceholder.typicode.com/users',
+  crossDomain: true,
+  method: 'GET',
+}).pipe(
+  pluck('response'),
+)
+  .subscribe((v) => {
+    console.log('ajax', v);
+  });
+
+timer(5000).subscribe((v) => {
+  console.log('timer', v)
+});
+
+const random: number = Math.round(Math.random() * 10);
+console.log('random', random);
+iif(() => {
+    return random > 5;
+  },
+  of('First sequence'),
+  of('Second sequence')).subscribe((v) => {
+  console.log('iif', v);
+});
+defer(() => {
+  return random > 8
+    ? of('First sequence')
+    : random > 4
+      ? of('Second sequence')
+      : of('Third sequence')
+}).subscribe((v) => {
+  console.log('defer', v)
+});
+
+
+// =============================================================================
+
+const sequence$: Observable<number> = interval(1000);
+
+/*
+  sequence$
+      ---- 0---- 1---- 2---- 3---- 4---- 5---- 6---- 7---- 8---- 9----10----
+
+    tap((x) => {
+      console.log(x);
+      return x;
+    })
+      ---- 0---- 1---- 2---- 3---- 4---- 5---- 6---- 7---- 8---- 9----10----
+
+    map((x) => x * 2)
+      ---- 0---- 2---- 4---- 6---- 8----10----12----14----16----18----20----
+
+    filter((x) => x % 3 === 0)
+      ---- 0---------------- 6----------------12----------------18----------
+
+    skip(2)
+      ----------------------------------------12----------------18----------
+
+    take(1)
+      ----------------------------------------12|
+*/
+
+sequence$
+  .pipe(
+    tap((v: number) => {
+      console.log('sequence$Element', v);
+      return v;
+    }),
+    map((v: number) => v * 2),
+    filter((v: number) => v % 3 === 0),
+    skip(2),
+    take(1),
+  ).subscribe((v: number) => {
+  terminalLog(`sequence$: ${v}`);
+  console.log('sequence$', v);
+});
+
+// =============================================================================
+
+
+
